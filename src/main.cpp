@@ -45,6 +45,9 @@ bool flyModeEnable = false;
 
 bool speedOn = false;
 
+
+float maximumSpeed = 2;
+
 UnityEngine::Vector3 inputVector;
 
 UnityEngine::Vector3 cameraEularAngles;
@@ -72,20 +75,17 @@ MAKE_HOOK_OFFSETLESS(GorillaTagManager_Update, void, GlobalNamespace::GorillaTag
     rightInput = OVRInput::GetDown(OVRInput::Button::Two, OVRInput::Controller::RTouch);
     leftInput = OVRInput::GetDown(OVRInput::Button::Two, OVRInput::Controller::LTouch);
 
-    if(allowFlyMode) {
-        if(leftInput || rightInput) {
-            if(flyModeEnable) {
-                flyModeEnable = false;
-                playerPhysics->set_velocity(Vector3::get_zero());
-                playerPhysics->set_useGravity(true);
-            }
-            else if(!flyModeEnable) {
-                flyModeEnable = true;
-                playerPhysics->set_velocity(Vector3::get_zero());
-            }
+    if(leftInput || rightInput) {
+        if(flyModeEnable) {
+            flyModeEnable = false;
+            playerPhysics->set_velocity(Vector3::get_zero());
+            playerPhysics->set_useGravity(true);
+        }
+        else if(!flyModeEnable) {
+            flyModeEnable = true;
+            playerPhysics->set_velocity(Vector3::get_zero());
         }
     }
-
     if(allowFlyMode) 
     {  
         if(flyModeEnable) {
@@ -105,8 +105,13 @@ MAKE_HOOK_OFFSETLESS(GorillaTagManager_Update, void, GlobalNamespace::GorillaTag
             
             float speed = UnityEngine::Vector3::Magnitude(playerPhysics->get_velocity());
             
-            if(speed > getConfig().config["maxSpeed"].GetFloat()) {
-                playerPhysics->set_velocity(playerPhysics->get_velocity().get_normalized() * getConfig().config["maxSpeed"].GetFloat());
+            if(speed > maximumSpeed) {
+                float brakeSpeed = speed - maximumSpeed;
+
+                Vector3 normalisedVelocity = playerPhysics->get_velocity().get_normalized();
+                Vector3 brakeVelocity = normalisedVelocity * brakeSpeed;
+
+                playerPhysics->AddForce(-brakeVelocity);
             }
         }
     }
@@ -158,11 +163,6 @@ extern "C" void setup(ModInfo& info) {
     modInfo = info;
 	
     getConfig().Load();
-    rapidjson::Document::AllocatorType& allocator = getConfig().config.GetAllocator();
-    if (!getConfig().config.HasMember("maxSpeed")) {
-        getConfig().config.AddMember("maxSpeed", rapidjson::Value(0).SetFloat(10), allocator);
-        getConfig().Write();
-    }
     getLogger().info("Completed setup!");
 }
 
